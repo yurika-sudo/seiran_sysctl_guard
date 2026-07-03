@@ -1,0 +1,77 @@
+<!doctype html>
+<html><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seiran Sysctl Guard</title>
+<style>
+body{background:#111;color:#eee;font-family:sans-serif;margin:0;padding:16px}
+h2{font-size:15px;color:#8bc34a;margin:0 0 10px}
+.card{background:#1a1a1a;border-radius:10px;padding:14px;margin-bottom:12px}
+.row{display:flex;justify-content:space-between;align-items:center;padding:6px 0}
+select,button{background:#2a2a2a;color:#eee;border:1px solid #444;border-radius:6px;padding:6px;width:100%}
+button{margin-top:8px}
+</style></head>
+<body>
+<div class="card"><h2>RAM / ZRAM</h2>
+  <div class="row"><span>RAM total</span><b id="ram">–</b></div>
+  <div class="row"><span>ZRAM size</span><b id="zram">–</b></div>
+  <button id="refresh-btn">Refresh</button>
+</div>
+<div class="card"><h2>TCP Congestion Control</h2><select id="tcp-select"></select></div>
+<div class="card"><h2>CPU Governor</h2><div id="gov-list"></div></div>
+
+<script>
+const MODDIR = '/data/adb/modules/seiran_sysctl_guard';
+
+function ksuExec(cmd) {
+  if (typeof ksu === 'undefined') return { errno: -1, stdout: '', stderr: 'no ksu bridge' };
+  try { return JSON.parse(ksu.exec(cmd)); }
+  catch (e) { return { errno: -1, stdout: '', stderr: String(e) }; }
+}
+function parseStatus(text) {
+  const out = {};
+  text.trim().split('\n').forEach(line => {
+    const i = line.indexOf('=');
+    if (i > -1) out[line.slice(0, i)] = line.slice(i + 1);
+  });
+  return out;
+}
+function buildSelect(id, available, current, onChange) {
+  const sel = document.getElementById(id);
+  sel.innerHTML = '';
+  (available || '').trim().split(/\s+/).forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v; opt.textContent = v;
+    if (v === current) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  sel.onchange = () => onChange(sel.value);
+}
+function refresh() {
+  const { stdout } = ksuExec(`sh ${MODDIR}/apply.sh status`);
+  const s = parseStatus(stdout || '');
+  document.getElementById('ram').textContent = (s.ram_mb || '?') + ' MB';
+  document.getElementById('zram').textContent = (s.zram_disksize_mb || '?') + ' MB';
+  buildSelect('tcp-select', s.tcp_available, s.tcp_current,
+    v => ksuExec(`sh ${MODDIR}/apply.sh tcp ${v}`));
+
+  const govBox = document.getElementById('gov-list');
+  govBox.innerHTML = '';
+  Object.keys(s).filter(k => k.startsWith('gov_') && k.endsWith('_current')).forEach(k => {
+    const pol = k.slice(4, -8);
+    const wrap = document.createElement('div'); wrap.className = 'row';
+    const label = document.createElement('span'); label.textContent = pol;
+    const sel = document.createElement('select');
+    (s[`gov_${pol}_available`] || '').trim().split(/\s+/).forEach(g => {
+      const opt = document.createElement('option');
+      opt.value = g; opt.textContent = g;
+      if (g === s[k]) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    sel.onchange = () => ksuExec(`sh ${MODDIR}/apply.sh gov ${pol} ${sel.value}`);
+    wrap.appendChild(label); wrap.appendChild(sel); govBox.appendChild(wrap);
+  });
+}
+document.getElementById('refresh-btn').onclick = refresh;
+refresh();
+</script>
+</body></html>
