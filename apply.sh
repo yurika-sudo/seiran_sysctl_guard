@@ -13,7 +13,6 @@ apply_defaults() {
   write /proc/sys/vm/dirty_background_ratio 10
   write /proc/sys/vm/dirty_ratio 20
   write /proc/sys/vm/stat_interval 10
-  write /sys/fs/cgroup/memory/bg/memory.swappiness 100
 }
 
 apply_zram() {
