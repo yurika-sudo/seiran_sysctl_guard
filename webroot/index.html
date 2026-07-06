@@ -1,31 +1,95 @@
-<!doctype html>
-<html><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Seiran Sysctl Guard</title>
 <style>
-body{background:#111;color:#eee;font-family:sans-serif;margin:0;padding:16px}
-h2{font-size:15px;color:#8bc34a;margin:0 0 10px}
-.card{background:#1a1a1a;border-radius:10px;padding:14px;margin-bottom:12px}
-.row{display:flex;justify-content:space-between;align-items:center;padding:6px 0}
-select,button{background:#2a2a2a;color:#eee;border:1px solid #444;border-radius:6px;padding:6px;width:100%}
-button{margin-top:8px}
-</style></head>
+  :root {
+    --bg: #0f0f13; --surface: #1a1a24; --border: #2a2a3a;
+    --accent: #7c6fe0; --accent2: #5dbbff;
+    --text: #e4e4f0; --muted: #6b6b88; --success: #4caf82; --danger: #f07070;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f4f8; --surface: #ffffff; --border: #dcdce4;
+      --accent: #5b4bd6; --accent2: #2b7fd6;
+      --text: #1c1c26; --muted: #6b6b80; --success: #2e8b57; --danger: #c23838;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; padding: 16px; }
+  header { margin-bottom: 20px; }
+  h1 { font-size: 16px; font-weight: 700; color: var(--accent); letter-spacing: 0.05em; }
+  .meta { font-size: 11px; color: var(--muted); margin-top: 4px; min-height: 16px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 10px; }
+  .card-title { font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent2); margin-bottom: 12px; }
+  .row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .row:last-child { margin-bottom: 0; }
+  label { font-size: 12px; color: var(--muted); flex: 1; }
+  select { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 7px; padding: 6px 9px; font-size: 13px; outline: none; cursor: pointer; }
+  select:disabled { opacity: 0.35; cursor: not-allowed; }
+  .val { font-size: 12px; font-variant-numeric: tabular-nums; }
+  .ok  { color: var(--success); }
+  .bad { color: var(--danger); }
+  .actions { display: flex; gap: 8px; margin-top: 14px; }
+  button { flex: 1; padding: 11px; border: none; border-radius: 9px; font-size: 13px; font-weight: 600; cursor: pointer; background: var(--border); color: var(--text); }
+  button:active { transform: scale(0.97); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  #msg { margin-top: 12px; padding: 9px 12px; border-radius: 7px; font-size: 12px; font-family: monospace; display: none; word-break: break-all; white-space: pre-wrap; }
+  .inf { display:block; background:#5dbbff22; color:var(--accent2); border:1px solid #5dbbff44; }
+  .msgok { display:block; background:#4caf8222; color:var(--success); border:1px solid #4caf8244; }
+  .err { display:block; background:#f0707022; color:var(--danger); border:1px solid #f0707044; }
+</style>
+</head>
 <body>
-<div class="card"><h2>RAM / ZRAM</h2>
-  <div class="row"><span>RAM total</span><b id="ram">–</b></div>
-  <div class="row"><span>ZRAM size</span><b id="zram">–</b></div>
-  <button id="refresh-btn">Refresh</button>
+<header>
+  <h1>Seiran Sysctl Guard</h1>
+  <div class="meta" id="device_info">—</div>
+</header>
+
+<div class="card">
+  <div class="card-title">RAM / ZRAM</div>
+  <div class="row"><label>RAM total</label><span class="val" id="ram">—</span></div>
+  <div class="row"><label>ZRAM size</label><span class="val" id="zram">—</span></div>
 </div>
-<div class="card"><h2>TCP Congestion Control</h2><select id="tcp-select"></select></div>
-<div class="card"><h2>CPU Governor</h2><div id="gov-list"></div></div>
+
+<div class="card">
+  <div class="card-title">Guard Status</div>
+  <div class="row"><label>swappiness</label><span class="val" id="v_swap">—</span></div>
+  <div class="row"><label>vfs_cache_pressure</label><span class="val" id="v_vfs">—</span></div>
+  <div class="row"><label>watermark_scale_factor</label><span class="val" id="v_wsf">—</span></div>
+  <div class="row"><label>overall</label><span class="val" id="v_applied">—</span></div>
+</div>
+
+<div class="card">
+  <div class="card-title">TCP Congestion Control</div>
+  <div class="row"><label>algo</label><select id="tcp_algo" disabled></select></div>
+</div>
+
+<div class="actions">
+  <button id="btn_refresh" onclick="load()">refresh</button>
+</div>
+<div id="msg"></div>
 
 <script>
+let _cbIdx = 0;
+function exec(cmd) {
+  return new Promise((resolve, reject) => {
+    const cb = 'guard_cb_' + Date.now() + '_' + (_cbIdx++);
+    window[cb] = (errno, stdout, stderr) => {
+      delete window[cb];
+      errno === 0 ? resolve((stdout || '').trim()) : reject(new Error('exit ' + errno + ': ' + (stderr || '').trim()));
+    };
+    try { ksu.exec(cmd, '{}', cb); } catch (e) { delete window[cb]; reject(e); }
+  });
+}
+
 const MODDIR = '/data/adb/modules/seiran_sysctl_guard';
 
-function ksuExec(cmd) {
-  if (typeof ksu === 'undefined') return { errno: -1, stdout: '', stderr: 'no ksu bridge' };
-  try { return JSON.parse(ksu.exec(cmd)); }
-  catch (e) { return { errno: -1, stdout: '', stderr: String(e) }; }
+function setMsg(text, cls) {
+  const el = document.getElementById('msg');
+  el.textContent = text; el.className = cls;
 }
 function parseStatus(text) {
   const out = {};
@@ -35,43 +99,57 @@ function parseStatus(text) {
   });
   return out;
 }
-function buildSelect(id, available, current, onChange) {
-  const sel = document.getElementById(id);
-  sel.innerHTML = '';
-  (available || '').trim().split(/\s+/).forEach(v => {
-    const opt = document.createElement('option');
-    opt.value = v; opt.textContent = v;
-    if (v === current) opt.selected = true;
-    sel.appendChild(opt);
-  });
-  sel.onchange = () => onChange(sel.value);
-}
-function refresh() {
-  const { stdout } = ksuExec(`sh ${MODDIR}/apply.sh status`);
-  const s = parseStatus(stdout || '');
-  document.getElementById('ram').textContent = (s.ram_mb || '?') + ' MB';
-  document.getElementById('zram').textContent = (s.zram_disksize_mb || '?') + ' MB';
-  buildSelect('tcp-select', s.tcp_available, s.tcp_current,
-    v => ksuExec(`sh ${MODDIR}/apply.sh tcp ${v}`));
 
-  const govBox = document.getElementById('gov-list');
-  govBox.innerHTML = '';
-  Object.keys(s).filter(k => k.startsWith('gov_') && k.endsWith('_current')).forEach(k => {
-    const pol = k.slice(4, -8);
-    const wrap = document.createElement('div'); wrap.className = 'row';
-    const label = document.createElement('span'); label.textContent = pol;
-    const sel = document.createElement('select');
-    (s[`gov_${pol}_available`] || '').trim().split(/\s+/).forEach(g => {
-      const opt = document.createElement('option');
-      opt.value = g; opt.textContent = g;
-      if (g === s[k]) opt.selected = true;
-      sel.appendChild(opt);
+async function load() {
+  setMsg('loading...', 'inf');
+  document.getElementById('btn_refresh').disabled = true;
+  try {
+    const out = await exec(`sh ${MODDIR}/apply.sh status`);
+    const s = parseStatus(out);
+    const dev = await exec('getprop ro.product.device');
+    const kern = await exec('uname -r');
+
+    document.getElementById('device_info').textContent = dev + '  ·  ' + kern;
+    document.getElementById('ram').textContent  = (s.ram_mb || '?') + ' MB';
+    document.getElementById('zram').textContent = (s.zram_disksize_mb || '?') + ' MB';
+    document.getElementById('v_swap').textContent = s.swappiness ?? '—';
+    document.getElementById('v_vfs').textContent  = s.vfs_cache_pressure ?? '—';
+    document.getElementById('v_wsf').textContent  = s.watermark_scale_factor ?? '—';
+
+    const okEl = document.getElementById('v_applied');
+    if (s.guard_applied === '1') { okEl.textContent = 'applied ✓'; okEl.className = 'val ok'; }
+    else { okEl.textContent = 'mismatch ✗ (rom overwrote it?)'; okEl.className = 'val bad'; }
+
+    const sel = document.getElementById('tcp_algo');
+    sel.innerHTML = '';
+    (s.tcp_available || '').trim().split(/\s+/).forEach(v => {
+      const o = document.createElement('option');
+      o.value = v; o.textContent = v;
+      if (v === s.tcp_current) o.selected = true;
+      sel.appendChild(o);
     });
-    sel.onchange = () => ksuExec(`sh ${MODDIR}/apply.sh gov ${pol} ${sel.value}`);
-    wrap.appendChild(label); wrap.appendChild(sel); govBox.appendChild(wrap);
-  });
+    sel.disabled = false;
+    sel.onchange = () => setTcp(sel.value);
+
+    setMsg('loaded.', 'msgok');
+  } catch (e) {
+    setMsg('load error: ' + e.message, 'err');
+  }
+  document.getElementById('btn_refresh').disabled = false;
 }
-document.getElementById('refresh-btn').onclick = refresh;
-refresh();
+
+async function setTcp(v) {
+  setMsg('applying tcp=' + v + '...', 'inf');
+  try {
+    await exec(`sh ${MODDIR}/apply.sh tcp ${v}`);
+    setMsg('tcp set to ' + v + ', saved.', 'msgok');
+    await load();
+  } catch (e) {
+    setMsg('apply error: ' + e.message, 'err');
+  }
+}
+
+window.addEventListener('load', load);
 </script>
-</body></html>
+</body>
+</html>
