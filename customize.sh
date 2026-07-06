@@ -1,5 +1,5 @@
 #!/system/bin/sh
-ui_print "Seiran Sysctl Guard v0.2.0"
+ui_print "Seiran Sysctl Guard v0.0.2"
 ui_print "device : $(getprop ro.product.device)"
 ui_print "kernel : $(uname -r)"
 set_perm_recursive "$MODPATH" root root 0755 0644
