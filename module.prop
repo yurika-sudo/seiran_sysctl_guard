@@ -1,6 +1,6 @@
 id=seiran_sysctl_guard
 name=Seiran Sysctl Guard
-version=v0.0.1
-versionCode=20260703
+version=v0.0.2
+versionCode=20260706
 author=superuseryu
-description=Companion enforcement module for Seiran Kernel. Re-applies sysctl defaults post-boot that some ROM init.rc or vendor perf-hal configs silently override. WebUI included for TCP congestion control and CPU governor selection.
+description=Re-applies vm.* sysctl + zram sizing post-boot that ROM init.rc/vendor perf-hal silently override. WebUI: pick TCP congestion control, check RAM/ZRAM, see whether guard defaults are actually applied. No governor forcing.
