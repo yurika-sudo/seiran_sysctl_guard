@@ -3,153 +3,316 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Seiran Sysctl Guard</title>
+<title>Seiran Toolkit</title>
 <style>
   :root {
     --bg: #0f0f13; --surface: #1a1a24; --border: #2a2a3a;
     --accent: #7c6fe0; --accent2: #5dbbff;
-    --text: #e4e4f0; --muted: #6b6b88; --success: #4caf82; --danger: #f07070;
+    --text: #e4e4f0; --muted: #6b6b88; --success: #4caf82; --danger: #f07070; --warn: #e0a83c;
   }
   @media (prefers-color-scheme: light) {
     :root {
       --bg: #f4f4f8; --surface: #ffffff; --border: #dcdce4;
       --accent: #5b4bd6; --accent2: #2b7fd6;
-      --text: #1c1c26; --muted: #6b6b80; --success: #2e8b57; --danger: #c23838;
+      --text: #1c1c26; --muted: #6b6b80; --success: #2e8b57; --danger: #c23838; --warn: #b5820a;
     }
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; padding: 16px; }
-  header { margin-bottom: 20px; }
-  h1 { font-size: 16px; font-weight: 700; color: var(--accent); letter-spacing: 0.05em; }
-  .meta { font-size: 11px; color: var(--muted); margin-top: 4px; min-height: 16px; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; padding: 16px; padding-bottom: 70px; }
+  h1 { font-size: 16px; font-weight: 700; color: var(--accent); margin-bottom: 16px; }
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 10px; }
-  .card-title { font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent2); margin-bottom: 12px; }
-  .row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .card-title { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent2); margin-bottom: 10px; }
+  .row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
   .row:last-child { margin-bottom: 0; }
   label { font-size: 12px; color: var(--muted); flex: 1; }
-  select { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 7px; padding: 6px 9px; font-size: 13px; outline: none; cursor: pointer; }
-  select:disabled { opacity: 0.35; cursor: not-allowed; }
-  .val { font-size: 12px; font-variant-numeric: tabular-nums; }
-  .ok  { color: var(--success); }
-  .bad { color: var(--danger); }
-  .actions { display: flex; gap: 8px; margin-top: 14px; }
-  button { flex: 1; padding: 11px; border: none; border-radius: 9px; font-size: 13px; font-weight: 600; cursor: pointer; background: var(--border); color: var(--text); }
-  button:active { transform: scale(0.97); }
-  button:disabled { opacity: 0.4; cursor: not-allowed; }
-  #msg { margin-top: 12px; padding: 9px 12px; border-radius: 7px; font-size: 12px; font-family: monospace; display: none; word-break: break-all; white-space: pre-wrap; }
-  .inf { display:block; background:#5dbbff22; color:var(--accent2); border:1px solid #5dbbff44; }
-  .msgok { display:block; background:#4caf8222; color:var(--success); border:1px solid #4caf8244; }
-  .err { display:block; background:#f0707022; color:var(--danger); border:1px solid #f0707044; }
+  .val { font-size: 12px; font-variant-numeric: tabular-nums; font-family: monospace; }
+  select, input[type=range] { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 7px; }
+  select { padding: 5px 8px; font-size: 12px; }
+  select.pending, input.pending { opacity: 0.45; }
+  .core-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .core-btn { text-align: center; padding: 8px 0; border-radius: 8px; font-size: 12px; font-family: monospace; border: 1px solid var(--border); cursor: pointer; background: var(--bg); }
+  .core-btn.on { color: var(--success); }
+  .core-btn.off { color: var(--danger); opacity: 0.6; }
+  .core-btn.locked { cursor: default; opacity: 0.4; }
+  .core-warn { color: var(--warn); font-size: 11px; margin-top: 8px; display: none; }
+  .err-banner { display: none; background: var(--danger); color: #fff; padding: 8px 12px; border-radius: 8px; font-size: 12px; margin-bottom: 10px; white-space: pre-wrap; }
+  .header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .header-row h1 { margin-bottom: 0; }
+  #themeSelect { font-size: 11px; padding: 4px 6px; }
+  footer { position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--border); padding: 10px 16px; display: flex; gap: 8px; }
+  button { flex: 1; padding: 10px; border: none; border-radius: 9px; font-size: 13px; font-weight: 600; cursor: pointer; background: var(--border); color: var(--text); }
+  button.danger { background: var(--danger); color: #fff; flex: 0 0 auto; padding: 10px 16px; }
 </style>
 </head>
 <body>
-<header>
-  <h1>Seiran Sysctl Guard</h1>
-  <div class="meta" id="device_info">—</div>
-</header>
+<div class="header-row">
+  <h1>Seiran Toolkit</h1>
+  <select id="themeSelect"></select>
+</div>
+<div class="err-banner" id="errBanner"></div>
+
+<div class="card"><div class="card-title">Battery</div><div id="batt" class="val">loading...</div></div>
 
 <div class="card">
-  <div class="card-title">RAM / ZRAM</div>
-  <div class="row"><label>RAM total</label><span class="val" id="ram">—</span></div>
-  <div class="row"><label>ZRAM size</label><span class="val" id="zram">—</span></div>
+  <div class="card-title">ZRAM</div>
+  <div class="row"><label>Size</label><select id="zramSize"></select></div>
+  <div class="row"><label>Algorithm</label><select id="zramAlgo"></select></div>
+</div>
+
+<div class="card" id="cluster0Card">
+  <div class="card-title">CPU Cluster 0</div>
+  <div class="row"><label>Governor</label><select id="c0Gov"></select></div>
+  <div class="row"><label>Min Freq</label><select id="c0Min"></select></div>
+  <div class="row"><label>Max Freq</label><select id="c0Max"></select></div>
+</div>
+<div class="card" id="cluster1Card">
+  <div class="card-title">CPU Cluster 1</div>
+  <div class="row"><label>Governor</label><select id="c1Gov"></select></div>
+  <div class="row"><label>Min Freq</label><select id="c1Min"></select></div>
+  <div class="row"><label>Max Freq</label><select id="c1Max"></select></div>
 </div>
 
 <div class="card">
-  <div class="card-title">Guard Status</div>
-  <div class="row"><label>swappiness</label><span class="val" id="v_swap">—</span></div>
-  <div class="row"><label>vfs_cache_pressure</label><span class="val" id="v_vfs">—</span></div>
-  <div class="row"><label>watermark_scale_factor</label><span class="val" id="v_wsf">—</span></div>
-  <div class="row"><label>overall</label><span class="val" id="v_applied">—</span></div>
+  <div class="card-title">Core Online</div>
+  <div class="core-grid" id="coreGrid"></div>
+  <div class="core-warn" id="coreWarn">⚠ multiple cores offline — may affect responsiveness</div>
 </div>
 
 <div class="card">
-  <div class="card-title">TCP Congestion Control</div>
-  <div class="row"><label>algo</label><select id="tcp_algo" disabled></select></div>
+  <div class="card-title">GPU</div>
+  <div class="row"><label>Governor</label><span class="val" id="gpuGov">—</span></div>
+  <div class="row"><label>Min Freq</label><select id="gpuMin"></select></div>
+  <div class="row"><label>Max Freq</label><select id="gpuMax"></select></div>
 </div>
 
-<div class="actions">
-  <button id="btn_refresh" onclick="load()">refresh</button>
+<div class="card">
+  <div class="card-title">TCP Congestion</div>
+  <div class="row"><label>Algorithm</label><select id="tcpAlgo"></select></div>
 </div>
-<div id="msg"></div>
+
+<div class="card">
+  <div class="card-title">Other</div>
+  <div class="row"><label>Freeze GMS</label><input type="checkbox" id="gmsOff"></div>
+  <div class="row"><label>Fast Charge</label><input type="checkbox" id="fcOn"></div>
+</div>
+
+<footer>
+  <button onclick="load()">Refresh</button>
+  <button class="danger" onclick="doNuke()">Nuke</button>
+</footer>
 
 <script>
-let _cbIdx = 0;
+// this is the whole "theme system" — a name→color map and one
+// function that overwrites two CSS custom properties already used
+// everywhere in the stylesheet. no component library, no build step.
+const THEMES = {
+  default: { accent: "#7c6fe0", accent2: "#5dbbff" },
+  blue:    { accent: "#3b82f6", accent2: "#60a5fa" },
+  red:     { accent: "#ef4444", accent2: "#f87171" },
+  purple:  { accent: "#a855f7", accent2: "#c084fc" },
+  green:   { accent: "#22c55e", accent2: "#4ade80" },
+  orange:  { accent: "#f97316", accent2: "#fb923c" },
+  pink:    { accent: "#ec4899", accent2: "#f472b6" },
+  cyan:    { accent: "#06b6d4", accent2: "#22d3ee" },
+  grey:    { accent: "#6b7280", accent2: "#9ca3af" },
+};
+function applyTheme(name) {
+  const t = THEMES[name] || THEMES.default;
+  document.documentElement.style.setProperty("--accent", t.accent);
+  document.documentElement.style.setProperty("--accent2", t.accent2);
+}
+(function initTheme() {
+  const sel = document.getElementById("themeSelect");
+  Object.keys(THEMES).forEach(name => {
+    const o = document.createElement("option");
+    o.value = name; o.textContent = name[0].toUpperCase() + name.slice(1);
+    sel.appendChild(o);
+  });
+  const saved = localStorage.getItem("seiran_theme") || "default";
+  sel.value = saved;
+  applyTheme(saved); // pure client-side, no bridge needed — runs immediately, no flash of default color
+  sel.onchange = e => { localStorage.setItem("seiran_theme", e.target.value); applyTheme(e.target.value); };
+})();
+
 function exec(cmd) {
-  return new Promise((resolve, reject) => {
-    const cb = 'guard_cb_' + Date.now() + '_' + (_cbIdx++);
-    window[cb] = (errno, stdout, stderr) => {
-      delete window[cb];
-      errno === 0 ? resolve((stdout || '').trim()) : reject(new Error('exit ' + errno + ': ' + (stderr || '').trim()));
+  return new Promise((resolve) => {
+    const cb = "excb_" + Math.random().toString(36).slice(2);
+    let settled = false;
+    const finish = (out) => {
+      if (settled) return; settled = true;
+      clearTimeout(timer); delete window[cb];
+      resolve(out || "");
     };
-    try { ksu.exec(cmd, '{}', cb); } catch (e) { delete window[cb]; reject(e); }
+    window[cb] = function () {
+      const a = Array.prototype.slice.call(arguments);
+      let stdout = "", errno = 0, stderr = "";
+      if (a.length >= 2) {
+        errno = a[0]; stdout = a[1] || ""; stderr = a[2] || "";
+      } else if (a.length === 1 && typeof a[0] === "string") {
+        try {
+          const j = JSON.parse(a[0]);
+          if (j && typeof j === "object") {
+            stdout = j.stdout ?? j.output ?? j.result ?? "";
+            errno = j.errno ?? j.code ?? 0;
+            stderr = j.stderr ?? "";
+          } else { stdout = a[0]; }
+        } catch (e) { stdout = a[0]; }
+      }
+      if (Number(errno) !== 0 && stderr) showError(cmd + " → exit " + errno + ": " + stderr);
+      finish(stdout);
+    };
+    const timer = setTimeout(() => {
+      showError("timeout: ksu.exec never called back after 60s\ncmd: " + cmd);
+      finish("");
+    }, 60000); // matches the timeout budget used by a known-working reference module (specter) for this same bridge
+    try { ksu.exec(cmd, "{}", cb); }
+    catch (e) { showError("ksu.exec threw: " + (e && e.message ? e.message : e)); finish(""); }
   });
 }
-
-const MODDIR = '/data/adb/modules/seiran_sysctl_guard';
-
-function setMsg(text, cls) {
-  const el = document.getElementById('msg');
-  el.textContent = text; el.className = cls;
+const MOD = "/data/adb/modules/seiran_toolkit"; // ponytail: hardcoded — a literal $MODDIR in a cmd string only works if ksu.exec's shell has it exported, unverified. action.sh gets it free via $0, this doesn't.
+function parse(txt) {
+  let o = {};
+  (txt||"").split("\n").forEach(l => { let i=l.indexOf("="); if(i>0) o[l.slice(0,i)] = l.slice(i+1); });
+  return o;
 }
-function parseStatus(text) {
-  const out = {};
-  text.trim().split('\n').forEach(line => {
-    const i = line.indexOf('=');
-    if (i > -1) out[line.slice(0, i)] = line.slice(i + 1);
+function fillSelect(sel, options, current) {
+  // two guards against the poll fighting the user — skip while the
+  // control has focus (dropdown open / being decided), and skip the rebuild
+  // entirely if nothing actually changed (avoids flicker + avoids dropping an
+  // open native picker for no reason).
+  if (document.activeElement === sel) return;
+  const sig = options.join(",") + "|" + current;
+  if (sel.dataset.sig === sig) return;
+  sel.dataset.sig = sig;
+  sel.innerHTML = "";
+  options.filter(Boolean).forEach(v => {
+    let o = document.createElement("option");
+    o.value = v; o.textContent = v; if (v === current) o.selected = true;
+    sel.appendChild(o);
   });
-  return out;
+}
+function setChecked(el, val) {
+  if (document.activeElement === el) return;
+  el.checked = val;
+}
+async function withPending(el, promise) {
+  // immediate feedback the moment a control changes, independent of
+  // how slow the actual operation is — dim+disable now, undim on settle. this
+  // is what "should show loading" needed, not a faster backend.
+  el.disabled = true;
+  el.classList.add("pending");
+  try { await promise; }
+  finally { el.disabled = false; el.classList.remove("pending"); load(); }
+}
+function showError(msg) {
+  const b = document.getElementById("errBanner");
+  b.textContent = msg; b.style.display = "block";
+}
+function clearError() { document.getElementById("errBanner").style.display = "none"; }
+
+const ZRAM_SIZES = [1024, 2048, 3072, 4096, 6144, 8192, 9216];
+
+let pollTimer = null;
+async function loadUnsafe() {
+  const raw = await exec(`sh ${MOD}/apply.sh status`);
+  const s = parse(raw);
+  if (Object.keys(s).length === 0) {
+    showError("status returned nothing parseable. raw response (first 300 chars):\n" + JSON.stringify(raw).slice(0, 300));
+    return;
+  }
+
+  document.getElementById("batt").innerText =
+    `${s.battery_capacity}%  ${s.battery_current_ma}mA  ${s.battery_power_w}W  ${s.battery_temp_c}°C  ${s.battery_cycles} cycles`;
+
+  fillSelect(document.getElementById("zramSize"), ZRAM_SIZES.map(String), s.zram_size_mb);
+  fillSelect(document.getElementById("zramAlgo"), (s.zram_algo_available||"").trim().split(/\s+/), s.zram_algo_current || s.zram_algo);
+
+  fillSelect(document.getElementById("c0Gov"), (s.cpu0_gov_available||"").trim().split(/\s+/), s.cpu0_gov_current);
+  fillSelect(document.getElementById("c0Min"), (s.cpu0_freqs_available||"").trim().split(/\s+/), s.cpu0_minfreq_current);
+  fillSelect(document.getElementById("c0Max"), (s.cpu0_freqs_available||"").trim().split(/\s+/), s.cpu0_maxfreq_current);
+  if (Number(s.cpu_clusters) >= 2) {
+    fillSelect(document.getElementById("c1Gov"), (s.cpu1_gov_available||"").trim().split(/\s+/), s.cpu1_gov_current);
+    fillSelect(document.getElementById("c1Min"), (s.cpu1_freqs_available||"").trim().split(/\s+/), s.cpu1_minfreq_current);
+    fillSelect(document.getElementById("c1Max"), (s.cpu1_freqs_available||"").trim().split(/\s+/), s.cpu1_maxfreq_current);
+  } else {
+    document.getElementById("cluster1Card").style.display = "none";
+  }
+
+  document.getElementById("gpuGov").innerText = s.gpu_gov_current || "—";
+  fillSelect(document.getElementById("gpuMin"), (s.gpu_freqs_available||"").trim().split(/\s+/), s.gpu_minfreq_current);
+  fillSelect(document.getElementById("gpuMax"), (s.gpu_freqs_available||"").trim().split(/\s+/), s.gpu_maxfreq_current);
+  fillSelect(document.getElementById("tcpAlgo"), (s.tcp_available||"").trim().split(/\s+/), s.tcp_cong);
+  setChecked(document.getElementById("gmsOff"), s.gms_disabled_actual === "1");
+  setChecked(document.getElementById("fcOn"), s.fastcharge_enabled === "1");
+
+  // only rebuild the core grid if the on/off pattern actually
+  // changed — this is what let a poll tick swap the DOM node out from under
+  // a finger mid-tap, making buttons feel unclickable.
+  let sig = "", offCount = 0, i = 0;
+  while (s["core" + i + "_online"] !== undefined) { sig += s["core" + i + "_online"]; if (s["core" + i + "_online"] !== "1") offCount++; i++; }
+  const grid = document.getElementById("coreGrid");
+  if (grid.dataset.sig !== sig) {
+    grid.dataset.sig = sig;
+    grid.innerHTML = "";
+    let j = 0;
+    while (s["core" + j + "_online"] !== undefined) {
+      const on = s["core" + j + "_online"] === "1";
+      const btn = document.createElement("div");
+      const idx = j;
+      btn.className = "core-btn " + (on ? "on" : "off") + (idx === 0 ? " locked" : "");
+      btn.textContent = "CPU" + idx + (on ? " on" : " off");
+      if (idx > 0) btn.onclick = () => exec(`sh ${MOD}/apply.sh set-core ${idx} ${on ? 0 : 1}`).then(load);
+      grid.appendChild(btn);
+      j++;
+    }
+  }
+  document.getElementById("coreWarn").style.display = offCount >= 2 ? "block" : "none";
+  clearError();
 }
 
+let busy = false;
 async function load() {
-  setMsg('loading...', 'inf');
-  document.getElementById('btn_refresh').disabled = true;
-  try {
-    const out = await exec(`sh ${MODDIR}/apply.sh status`);
-    const s = parseStatus(out);
-    const dev = await exec('getprop ro.product.device');
-    const kern = await exec('uname -r');
-
-    document.getElementById('device_info').textContent = dev + '  ·  ' + kern;
-    document.getElementById('ram').textContent  = (s.ram_mb || '?') + ' MB';
-    document.getElementById('zram').textContent = (s.zram_disksize_mb || '?') + ' MB';
-    document.getElementById('v_swap').textContent = s.swappiness ?? '—';
-    document.getElementById('v_vfs').textContent  = s.vfs_cache_pressure ?? '—';
-    document.getElementById('v_wsf').textContent  = s.watermark_scale_factor ?? '—';
-
-    const okEl = document.getElementById('v_applied');
-    if (s.guard_applied === '1') { okEl.textContent = 'applied ✓'; okEl.className = 'val ok'; }
-    else { okEl.textContent = 'mismatch ✗ (rom overwrote it?)'; okEl.className = 'val bad'; }
-
-    const sel = document.getElementById('tcp_algo');
-    sel.innerHTML = '';
-    (s.tcp_available || '').trim().split(/\s+/).forEach(v => {
-      const o = document.createElement('option');
-      o.value = v; o.textContent = v;
-      if (v === s.tcp_current) o.selected = true;
-      sel.appendChild(o);
-    });
-    sel.disabled = false;
-    sel.onchange = () => setTcp(sel.value);
-
-    setMsg('loaded.', 'msgok');
-  } catch (e) {
-    setMsg('load error: ' + e.message, 'err');
-  }
-  document.getElementById('btn_refresh').disabled = false;
+  if (busy) return;
+  busy = true;
+  try { await loadUnsafe(); }
+  catch (e) { showError("load() failed: " + (e && e.message ? e.message : e)); }
+  finally { busy = false; }
 }
 
-async function setTcp(v) {
-  setMsg('applying tcp=' + v + '...', 'inf');
-  try {
-    await exec(`sh ${MODDIR}/apply.sh tcp ${v}`);
-    setMsg('tcp set to ' + v + ', saved.', 'msgok');
-    await load();
-  } catch (e) {
-    setMsg('apply error: ' + e.message, 'err');
-  }
+async function doNuke() {
+  if (!confirm("Reset everything and turn off all tweaks now? No reboot needed, can't be undone.")) return;
+  try { const out = await exec(`sh ${MOD}/apply.sh nuke`); showError(out); await loadUnsafe(); }
+  catch (e) { showError("nuke failed: " + (e && e.message ? e.message : e)); }
 }
 
-window.addEventListener('load', load);
+function waitForKsu(cb, tries) {
+  tries = tries || 0;
+  if (window.ksu && typeof ksu.exec === "function") {
+    exec("echo warmup"); // ponytail: pay the suspected cold-start bridge cost now, not on the user's first real tap
+    return cb();
+  }
+  if (tries > 50) return showError("ksu bridge never became available (waited 5s)");
+  setTimeout(() => waitForKsu(cb, tries + 1), 100);
+}
+
+document.getElementById("zramSize").onchange = e => withPending(e.target, exec(`sh ${MOD}/apply.sh set-zram 1 ${e.target.value}`));
+document.getElementById("zramAlgo").onchange = e => withPending(e.target, exec(`sh ${MOD}/apply.sh set-zram-algo ${e.target.value}`));
+document.getElementById("c0Gov").onchange = e => withPending(e.target, exec(`sh ${MOD}/apply.sh set-cpu-gov 0 ${e.target.value}`));
+document.getElementById("c0Min").onchange = e => withPending(e.target, exec(`sh ${MOD}/apply.sh set-cpu-minfreq 0 ${e.target.value}`));
+document.getElementById("c0Max").onchange = e => withPending(e.target, exec(`sh ${MOD}/apply.sh set-cpu-maxfreq 0 ${e.target.value}`));
+document.getElementById("c1Gov").onchange = e => withPending(e.target, exec(`sh ${MOD}/apply.sh set-cpu-gov 1 ${e.target.value}`));
+document.getElementById("c1Min").onchange = e => withPending(e.target, exec(`sh ${MOD}/apply.sh set-cpu-minfreq 1 ${e.target.value}`));
+document.getElementById("c1Max").onchange = e => withPending(e.target, exec(`sh ${MOD}/apply.sh set-cpu-maxfreq 1 ${e.target.value}`));
+document.getElementById("gpuMin").onchange = e => withPending(e.target, exec(`sh ${MOD}/apply.sh set-gpu-minfreq ${e.target.value}`));
+document.getElementById("gpuMax").onchange = e => withPending(e.target, exec(`sh ${MOD}/apply.sh set-gpu-maxfreq ${e.target.value}`));
+document.getElementById("tcpAlgo").onchange = e => withPending(e.target, exec(`sh ${MOD}/apply.sh set-tcp ${e.target.value}`));
+document.getElementById("gmsOff").onchange = e => exec(`sh ${MOD}/apply.sh set-gms ${e.target.checked ? 1 : 0}`);
+document.getElementById("fcOn").onchange = e => exec(`sh ${MOD}/apply.sh set-fastcharge ${e.target.checked ? 1 : 0}`);
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) { clearInterval(pollTimer); } else { pollTimer = setInterval(load, 900); }
+});
+waitForKsu(() => { load(); pollTimer = setInterval(load, 900); });
 </script>
 </body>
 </html>
