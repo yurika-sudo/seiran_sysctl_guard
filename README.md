@@ -1,4 +1,4 @@
-# Seiran Sysctl Guard
+# Seiran Toolkit
 
 Companion enforcement module for [Seiran Kernel](https://github.com/superuseryu/kernel_sapphire_SM6225).
 
